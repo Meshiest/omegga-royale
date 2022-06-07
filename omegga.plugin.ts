@@ -219,11 +219,9 @@ export default class Plugin implements OmeggaPlugin<Config, Storage> {
         const brick_owners = Array.from({ length: rings.length }).map((_, i) =>
           ringId(i)
         );
-        console.debug('[debug] owners', brick_owners);
         const ringBricks = rings.flatMap(([center, rad], i) =>
           renderRing(center, rad, i)
         );
-        console.debug('[debug] ring bricks', ringBricks.length);
         const data: WriteSaveObject = {
           brick_owners,
           bricks: [...ringBricks],
