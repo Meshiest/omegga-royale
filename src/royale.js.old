@@ -1,0 +1,90 @@
+const ringId = n => ({
+  id: '00000000-1111-111a-111c-' + n.toString(16).padStart(12, '0'),
+  name: 'BR_GEN_'+n,
+});
+
+class Royale {
+  constructor(omegga, config, store) {
+    this.omegga = omegga;
+    this.config = config;
+    this.store = store;
+  }
+
+  async init() {
+    Omegga
+      .on('cmd:br', async (name) => {
+        if (!Omegga.getPlayer(name).isHost()) return;
+
+        try {
+          console.time('saving');
+          const data = await Omegga.getSaveData();
+          console.timeEnd('saving');
+          if (!data) return console.log('failed to save');
+          console.log('data is', typeof data);
+          console.log('Found', data.brick_count, 'bricks');
+
+          let corners = [...data.bricks[0].position.slice(0, 2), ...data.bricks[0].position.slice(0, 2)];
+
+          for (const {position: [x, y, ]} of data.bricks) {
+            corners[0] = Math.min(corners[0], x);
+            corners[1] = Math.min(corners[1], y);
+            corners[2] = Math.max(corners[2], x);
+            corners[3] = Math.max(corners[3], y);
+          }
+          console.log(corners);
+
+          const numOwners = 10;
+
+          data.brick_owners = Array.from({length: numOwners}).map((_, i) => ringId(i));
+          const center = [(corners[0]+corners[2])/2, (corners[1]+corners[3])/2];
+          const radius = Math.hypot(corners[2]-corners[0], corners[3]-corners[1])/2;
+
+          for (const b of data.bricks) {
+            const dist = Math.hypot(b.position[0] - center[0], b.position[1] - center[1]);
+            const id = Math.max(Math.min(Math.floor(dist/radius * numOwners), numOwners - 1), 0);
+            b.owner_index = id + 1;
+          }
+
+          for (let i = 0; i < numOwners; i++) {
+            setTimeout(() => {
+              Omegga.clearBricks(data.brick_owners[i]);
+            }, i * 2000 + 5000);
+          }
+
+          // clear all bricks
+          Omegga.clearAllBricks();
+
+          // write save data
+          Omegga.writeSaveData('bugged', data);
+
+          // load updated data
+          await Omegga.loadSaveData(data);
+        } catch (err) {
+          console.error(err);
+        }
+
+
+        /* //DEBUG - render corners
+        Omegga.loadSaveData({
+          version: 4,
+          brick_owners: [ringId(0)],
+          bricks: [{
+            owner_index: 1,
+            position: [corners[0], corners[1], 400],
+            size: [30, 30, 50],
+          }, {
+            owner_index: 1,
+            position: [corners[2], corners[3], 400],
+            size: [30, 30, 50],
+          },]
+        });*/
+
+      });
+
+    return {registeredCommands: ['br']};
+  }
+
+  async stop() {}
+}
+
+module.exports = Royale;
